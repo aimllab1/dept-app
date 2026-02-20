@@ -253,7 +253,7 @@ function StaffDashboard() {
                     <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tight leading-none">Real-Time Stats</h2>
                     <div className="flex space-x-2 bg-gray-200/50 p-1.5 rounded-2xl w-fit">
                        {[2, 3, 4].map(y => (
-                          <button key={y} onClick={() => setDashboardYear(y)} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${dashboardYear === y ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500'}`}>{y}rd Year</button>
+                          <button key={y} onClick={() => setDashboardYear(y)} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${dashboardYear === y ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500'}`}>{y}{y === 2 ? 'nd' : y === 3 ? 'rd' : 'th'} Year</button>
                        ))}
                     </div>
                   </div>
@@ -287,7 +287,7 @@ function StaffDashboard() {
                   </div>
                   <div className="flex space-x-2 bg-gray-200/50 p-1.5 rounded-2xl w-fit">
                      {[2, 3, 4].map(y => (
-                        <button key={y} onClick={() => setSelectedYear(y)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedYear === y ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500'}`}>{y}rd Year</button>
+                        <button key={y} onClick={() => setSelectedYear(y)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedYear === y ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500'}`}>{y}{y === 2 ? 'nd' : y === 3 ? 'rd' : 'th'} Year</button>
                      ))}
                   </div>
                   <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden text-left">
