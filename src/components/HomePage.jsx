@@ -20,13 +20,6 @@ const RevealSection = ({ id, title, children, color, hoveredSection, setHoveredS
           {children}
         </div>
       </div>
-      {hoveredSection !== id && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-           <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] animate-pulse">
-             {window.matchMedia('(pointer: coarse)').matches ? 'Tap to Reveal' : 'Hover to Reveal'}
-           </span>
-        </div>
-      )}
     </div>
 );
 
