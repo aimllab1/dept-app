@@ -70,12 +70,12 @@ function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 max-w-4xl mx-auto mb-12 sm:mb-20 px-2">
-             <Link to="/login" className="flex-1 bg-white text-gray-900 border border-gray-100 p-8 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-2 group">
+             <Link to="/login" state={{ userType: 'student' }} className="flex-1 bg-white text-gray-900 border border-gray-100 p-8 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-2 group">
                 <span className="block text-3xl sm:text-4xl mb-4 group-hover:scale-110 transition-transform">🎓</span>
                 <span className="block text-lg sm:text-xl font-black uppercase tracking-widest mb-2">Student</span>
                 <span className="text-xs sm:text-sm text-gray-400 font-bold">Access Attendance & Results</span>
              </Link>
-             <Link to="/login" className="flex-1 bg-blue-700 text-white p-8 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl shadow-blue-200 hover:shadow-blue-300 transition-all transform hover:-translate-y-2 group">
+             <Link to="/login" state={{ userType: 'staff' }} className="flex-1 bg-blue-700 text-white p-8 sm:p-10 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl shadow-blue-200 hover:shadow-blue-300 transition-all transform hover:-translate-y-2 group">
                 <span className="block text-3xl sm:text-4xl mb-4 group-hover:scale-110 transition-transform">👨‍🏫</span>
                 <span className="block text-lg sm:text-xl font-black uppercase tracking-widest mb-2">Faculty</span>
                 <span className="text-xs sm:text-sm text-blue-200 font-bold">Manage Students & Academics</span>
