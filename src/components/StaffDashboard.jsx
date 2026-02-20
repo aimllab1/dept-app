@@ -47,10 +47,11 @@ function StaffDashboard() {
   const [bulkTestType, setBulkTestType] = useState('Slip Test 1');
   const [studentMarks, setStudentMarks] = useState({});
   const [newPassword, setNewPassword] = useState('');
-  const [eventForm, setEventForm] = useState({ title: '', description: '', type: 'Symposium', imageUrl: '' });
+  const [eventForm, setEventForm] = useState({ title: '', description: '', type: 'Symposium', imageUrl: '', eventUrl: '' });
+  const [visibleDescriptions, setVisibleDescriptions] = useState({});
   const [batchForm, setBatchForm] = useState({ name: '', startYear: 2024, endYear: 2028 });
   const [staffForm, setStaffForm] = useState({ name: '', password: '', role: '', profileImage: '' });
-  const [studentForm, setStudentForm] = useState({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '' });
+  const [studentForm, setStudentForm] = useState({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '', address: '' });
   const [subjectForm, setSubjectForm] = useState({ name: '', code: '', semester: 6, staffId: '' });
 
   // Queries
@@ -158,7 +159,7 @@ function StaffDashboard() {
   const handleLogout = () => { localStorage.removeItem('aec_user'); window.location.href = '/login'; };
   const handleMarkAllPresent = () => { const newMap = { ...localAttendance }; filteredAttendanceStudents.forEach(s => { newMap[s._id] = 'present'; }); setLocalAttendance(newMap); };
   const handleSubmitAttendance = async () => { if (!window.confirm('Submit attendance?')) return; for (const [sid, status] of Object.entries(localAttendance)) { await markAttendanceMutation({ studentId: sid, date: attendanceDate, status }); } alert('Submitted!'); };
-  const handlePostEvent = async (e) => { e.preventDefault(); await postEventMutation({ ...eventForm, postedBy: loggedInUser.name }); setEventForm({ title: '', description: '', type: 'Symposium', imageUrl: '' }); alert('Published!'); };
+  const handlePostEvent = async (e) => { e.preventDefault(); await postEventMutation({ ...eventForm, requesterId: loggedInUser._id.toString(), postedBy: loggedInUser.name }); setEventForm({ title: '', description: '', type: 'Symposium', imageUrl: '', eventUrl: '' }); alert('Published!'); };
   const handleImageUpload = (e, callback) => {
     const file = e.target.files[0];
     if (file) {
@@ -168,21 +169,28 @@ function StaffDashboard() {
         img.src = reader.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 600; 
-          const MAX_HEIGHT = 600;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-          } else {
-            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-          }
-          canvas.width = width;
-          canvas.height = height;
+          const targetWidth = 800;
+          const targetHeight = 600; // 4:3 Ratio
+          
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // Compress to 60% quality
+
+          // Calculate source dimensions to crop from center
+          let srcX = 0, srcY = 0, srcWidth = img.width, srcHeight = img.height;
+          const imgAspect = img.width / img.height;
+          const targetAspect = 4 / 3;
+
+          if (imgAspect > targetAspect) {
+            srcWidth = img.height * targetAspect;
+            srcX = (img.width - srcWidth) / 2;
+          } else {
+            srcHeight = img.width / targetAspect;
+            srcY = (img.height - srcHeight) / 2;
+          }
+
+          ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, targetWidth, targetHeight);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
           callback(dataUrl);
         };
       };
@@ -414,7 +422,7 @@ function StaffDashboard() {
                               .filter(s => (batches.find(b => b._id === marksBatchId)?.name === s.currentBatch))
                               .sort((a, b) => (a.registrationNo || "").localeCompare(b.registrationNo || ""))
                               .map(s => (
-                              <div key={s._id} className="p-6 flex items-center justify-between hover:bg-blue-50/30 text-left text-left"><div className="text-left text-left text-left"><p className="font-bold text-gray-900 uppercase leading-none">{s.name}</p><p className="text-[10px] font-bold text-gray-400 mt-1">{s.registrationNo}</p></div><input className="w-24 text-center p-3 bg-gray-50 border border-gray-100 rounded-xl font-black text-blue-600 outline-none text-left" placeholder="0" value={studentMarks[s._id] || ''} onChange={e => setStudentMarks(prev => ({...prev, [s._id]: e.target.value}))} /></div>
+                              <div key={s._id} className="p-6 flex items-center justify-between hover:bg-blue-50/30 text-left text-left"><div className="text-left text-left text-left"><p className="font-bold text-gray-900 uppercase leading-none">{s.name}</p><p className="text-[10px] font-bold text-gray-400 mt-1">{s.registrationNo}</p></div><input className={`w-24 text-center p-3 bg-gray-50 border border-gray-100 rounded-xl font-black outline-none text-left ${parseInt(studentMarks[s._id]) < 50 ? 'text-rose-600' : 'text-blue-600'}`} placeholder="0" value={studentMarks[s._id] || ''} onChange={e => setStudentMarks(prev => ({...prev, [s._id]: e.target.value}))} /></div>
                            ))}
                         </div>
                         <div className="p-8 bg-gray-50 flex justify-end text-left text-left"><button onClick={async () => { const marksData = Object.entries(studentMarks).map(([sid, sc]) => ({ studentId: sid, score: sc })); await postBulkMarksMutation({ subjectId: bulkMarkSubjectId, testType: bulkTestType, marks: marksData }); alert('Applied!'); }} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-left text-left text-left shadow-lg shadow-blue-100 active:scale-95 transition-all">Apply Scores</button></div>
@@ -438,9 +446,10 @@ function StaffDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left">
                      <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100 text-left">
                         <h3 className="text-xl font-black mb-8 uppercase text-left text-left">Publish</h3>
-                        <form onSubmit={handlePostEvent} className="space-y-6 text-left text-left">
+                        <form onSubmit={handlePostEvent} className="space-y-6 text-left text-left text-left">
                            <input className="input-field text-left" placeholder="Title" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} required />
                            <textarea className="input-field h-32 text-left" placeholder="Details" value={eventForm.description} onChange={e => setEventForm({...eventForm, description: e.target.value})} required />
+                           <input className="input-field text-left" placeholder="Event Link (Optional)" value={eventForm.eventUrl || ''} onChange={e => setEventForm({...eventForm, eventUrl: e.target.value})} />
                            <div className="grid grid-cols-2 gap-4 text-left">
                               <select className="input-field text-left text-left" value={eventForm.type} onChange={e => setEventForm({...eventForm, type: e.target.value})}>
                                  <option value="Symposium">Symposium</option>
@@ -449,15 +458,30 @@ function StaffDashboard() {
                               </select>
                               <div className="relative group cursor-pointer text-left text-left">
                                  <input type="file" accept="image/*" className="hidden" id="staff-img-ev" onChange={e => handleImageUpload(e, (res) => setEventForm({...eventForm, imageUrl: res}))} />
-                                 <label htmlFor="staff-img-ev" className="w-full h-full flex items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl text-[10px] font-black text-gray-400 uppercase py-4">
-                                    {eventForm.imageUrl ? 'Photo Loaded' : '+ Add Photo'}
+                                 <label htmlFor="staff-img-ev" className="w-full aspect-[4/3] flex items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl text-[10px] font-black text-gray-400 uppercase overflow-hidden">
+                                    {eventForm.imageUrl ? <img src={eventForm.imageUrl} className="w-full h-full object-cover" alt="" /> : '+ Add Photo'}
                                  </label>
                               </div>
                            </div>
                            <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase shadow-xl text-left">Publish</button>
                         </form>
                      </div>
-                     <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden text-left"><div className="p-8 border-b bg-gray-50 font-black uppercase text-xs text-left">History</div><div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto text-left">{announcements.map(a => (<div key={a._id} className="p-6 text-left text-left"><div className="flex justify-between items-start mb-2"><span className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-[8px] font-black uppercase text-left">{a.type}</span><button onClick={() => removeEventMutation({id: a._id})} className="text-rose-500 text-[10px] font-black uppercase text-left">Del</button></div><p className="font-black text-gray-900 uppercase leading-none text-left">{a.title}</p></div>))}</div></div>
+                     <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden text-left"><div className="p-8 border-b bg-gray-50 font-black uppercase text-xs text-left">History</div><div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto text-left">{announcements.map(a => (
+                        <div key={a._id} className="p-6 text-left text-left">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-[8px] font-black uppercase text-left">{a.type}</span>
+                            <div className="flex gap-2">
+                              {a.eventUrl && <a href={a.eventUrl} target="_blank" rel="noreferrer" className="text-blue-600 text-[10px] font-black uppercase">Visit</a>}
+                              <button onClick={() => setVisibleDescriptions(prev => ({...prev, [a._id]: !prev[a._id]}))} className="text-gray-500 text-[10px] font-black uppercase">{visibleDescriptions[a._id] ? 'Hide' : 'View'}</button>
+                              <button onClick={() => removeEventMutation({requesterId: loggedInUser._id.toString(), id: a._id})} className="text-rose-500 text-[10px] font-black uppercase text-left">Del</button>
+                            </div>
+                          </div>
+                          {a.imageUrl && (
+                            <img src={a.imageUrl} alt="" className="w-full aspect-[4/3] object-cover rounded-2xl mb-4 border border-gray-100" />
+                          )}
+                          <p className="font-black text-gray-900 uppercase leading-none text-left">{a.title}</p>
+                          {visibleDescriptions[a._id] && <p className="mt-2 text-xs text-gray-500 font-bold">{a.description}</p>}
+                        </div>))}</div></div>
                   </div>
                </div>
             )}
@@ -482,7 +506,7 @@ function StaffDashboard() {
                         </div>
                         {isAdmin && isAddingBatch && (
                            <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100 text-left animate-fade-in text-left text-left">
-                              <form onSubmit={async (e) => { e.preventDefault(); await createBatchMutation({...batchForm, loggedInUserRole: 'hod'}); alert('Done!'); setIsAddingBatch(false); }} className="space-y-4 text-left text-left text-left text-left"><input className="input-field text-left text-left" placeholder="Name" value={batchForm.name} onChange={e => setBatchForm({...batchForm, name: e.target.value})} required /><div className="grid grid-cols-2 gap-4 text-left text-left text-left"><input type="number" className="input-field text-left text-left text-left" placeholder="Start" value={batchForm.startYear} onChange={e => setBatchForm({...batchForm, startYear: parseInt(e.target.value)})} required /><input type="number" className="input-field text-left text-left text-left text-left" placeholder="End" value={batchForm.endYear} onChange={e => setBatchForm({...batchForm, endYear: parseInt(e.target.value)})} required /></div><button type="submit" className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] shadow-xl text-left text-left text-left">Confirm</button></form>
+                              <form onSubmit={async (e) => { e.preventDefault(); await createBatchMutation({...batchForm, requesterId: loggedInUser._id.toString()}); alert('Done!'); setIsAddingBatch(false); }} className="space-y-4 text-left text-left text-left text-left"><input className="input-field text-left text-left" placeholder="Name" value={batchForm.name} onChange={e => setBatchForm({...batchForm, name: e.target.value})} required /><div className="grid grid-cols-2 gap-4 text-left text-left text-left"><input type="number" className="input-field text-left text-left text-left" placeholder="Start" value={batchForm.startYear} onChange={e => setBatchForm({...batchForm, startYear: parseInt(e.target.value)})} required /><input type="number" className="input-field text-left text-left text-left text-left" placeholder="End" value={batchForm.endYear} onChange={e => setBatchForm({...batchForm, endYear: parseInt(e.target.value)})} required /></div><button type="submit" className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] shadow-xl text-left text-left text-left">Confirm</button></form>
                            </div>
                         )}
                      </div>
@@ -502,7 +526,12 @@ function StaffDashboard() {
                                           <div className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden border border-gray-200 text-left text-left text-left text-left text-left text-left"><img src={s.profileImage || `https://ui-avatars.com/api/?name=${s.name}`} className="w-full h-full object-cover text-left text-left text-left text-left text-left text-left" alt="" /></div>
                                           <div className="text-left text-left text-left text-left text-left text-left text-left text-left text-left"><p className="font-bold text-gray-900 uppercase tracking-tight text-left text-left text-left text-left text-left text-left">{s.name}</p><p className="text-[10px] font-black text-gray-400 uppercase mt-1 text-left text-left text-left text-left text-left text-left text-left">{s.registrationNo}</p></div>
                                        </div>
-                                       {isAdmin ? <button onClick={() => setEditingStudent(s)} className="text-[10px] font-black text-blue-600 border border-blue-100 px-4 py-2 rounded-full hover:bg-blue-600 hover:text-white transition-all text-left text-left text-left text-left text-left">Edit</button> : <button onClick={() => navigate('/student-dashboard', { state: { user: s } })} className="text-[10px] font-black text-indigo-600 border border-indigo-100 px-4 py-2 rounded-full text-left text-left text-left text-left text-left text-left text-left">View</button>}
+                                       {isAdmin ? (
+                                         <div className="flex gap-2">
+                                           <button onClick={() => setEditingStudent(s)} className="text-[10px] font-black text-blue-600 border border-blue-100 px-4 py-2 rounded-full hover:bg-blue-600 hover:text-white transition-all text-left text-left text-left text-left text-left">Edit</button>
+                                           <button onClick={async () => { if(window.confirm(`Permanently remove ${s.name}?`)) { await removeUserMutation({requesterId: loggedInUser._id.toString(), id: s._id}); alert('Student Removed'); }}} className="text-[10px] font-black text-rose-600 border border-rose-100 px-4 py-2 rounded-full hover:bg-rose-600 hover:text-white transition-all text-left text-left text-left text-left text-left">Del</button>
+                                         </div>
+                                       ) : <button onClick={() => navigate('/student-dashboard', { state: { user: s } })} className="text-[10px] font-black text-indigo-600 border border-indigo-100 px-4 py-2 rounded-full text-left text-left text-left text-left text-left text-left text-left">View</button>}
                                     </div>
                                  ))}
                               </div>
@@ -521,7 +550,7 @@ function StaffDashboard() {
                     <button onClick={() => setActiveView('add-subject')} className="bg-blue-600 text-white px-6 py-3 rounded-full font-black text-[10px] uppercase shadow-lg text-left text-left text-left">New Subject</button>
                   </div>
                   <div className="flex flex-wrap gap-2 bg-gray-200/50 p-1.5 rounded-2xl text-left text-left text-left text-left">
-                     {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (<button key={sem} onClick={() => setSelectedSemTab(sem)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedSemTab === sem ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500'}`}>Sem {sem}</button>))}
+                     {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (<button key={sem} onClick={() => setSelectedSemTab(sem)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${setSelectedSemTab === sem ? 'bg-white text-blue-600 shadow-md' : 'text-gray-500'}`}>Sem {sem}</button>))}
                   </div>
                   <div className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden text-left text-left text-left text-left text-left text-left">
                      <div className="divide-y divide-gray-100 text-left text-left text-left text-left text-left text-left text-left">
@@ -530,7 +559,7 @@ function StaffDashboard() {
                               <div className="text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><p className="font-black text-gray-900 uppercase text-lg leading-none">{sub.name}</p><p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-2">{sub.code} • {sub.staffName}</p></div>
                               <div className="flex space-x-4">
                                  <button onClick={() => setEditingSubject(sub)} className="text-[10px] font-black text-gray-400 hover:text-blue-600 uppercase tracking-widest text-left text-left text-left">Reassign</button>
-                                 <button onClick={async () => { if(window.confirm(`Delete ${sub.name}?`)) { await removeSubjectMutation({id: sub._id}); alert('Deleted'); }}} className="text-[10px] font-black text-rose-400 hover:text-rose-600 uppercase tracking-widest">Delete</button>
+                                 <button onClick={async () => { if(window.confirm(`Delete ${sub.name}?`)) { await removeSubjectMutation({requesterId: loggedInUser._id.toString(), id: sub._id}); alert('Deleted'); }}} className="text-[10px] font-black text-rose-400 hover:text-rose-600 uppercase tracking-widest">Delete</button>
                               </div>
                            </div>
                         ))}
@@ -544,7 +573,7 @@ function StaffDashboard() {
                <div className="space-y-8 text-left">
                   <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tight">New Course</h2>
                   <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 max-w-2xl mx-auto">
-                     <form onSubmit={async (e) => { e.preventDefault(); await addSubjectMutation(subjectForm); alert('Subject Added!'); setActiveView('subjects'); setSubjectForm({ name: '', code: '', semester: 6, staffId: '' }); }} className="space-y-6">
+                     <form onSubmit={async (e) => { e.preventDefault(); await addSubjectMutation({...subjectForm, requesterId: loggedInUser._id.toString()}); alert('Subject Added!'); setActiveView('subjects'); setSubjectForm({ name: '', code: '', semester: 6, staffId: '' }); }} className="space-y-6">
                         <div className="space-y-2">
                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Subject Name</label>
                            <input className="input-field" placeholder="E.g. Machine Learning" value={subjectForm.name} onChange={e => setSubjectForm({...subjectForm, name: e.target.value})} required />
@@ -643,7 +672,10 @@ function StaffDashboard() {
             {/* ➕ ENROLL STUDENT */}
             {activeView === 'add-student' && isAdmin && (
                <div className="space-y-8 text-left text-left text-left text-left text-left">
-                  <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tight text-left text-left text-left">New Student</h2>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setActiveView('directory')} className="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-blue-600 shadow-sm transition-all">←</button>
+                    <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tight text-left text-left text-left">New Student</h2>
+                  </div>
                   <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 max-w-3xl mx-auto text-left text-left text-left text-left">
                      <form onSubmit={async (e) => { 
                         e.preventDefault(); 
@@ -651,14 +683,16 @@ function StaffDashboard() {
                            await addStudentMutation(studentForm); 
                            alert('Enrolled!'); 
                            setActiveView('directory'); 
-                           setStudentForm({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '' });
+                           setStudentForm({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '', address: '' });
                         } catch (err) {
                            console.error(err);
                            alert("Failed to enroll student: " + err.message);
                         }
                      }} className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-left text-left text-left text-left text-left text-left text-left">
-                        <div className="sm:col-span-2 flex justify-center mb-4 text-left text-left text-left text-left text-left text-left"><div className="relative group cursor-pointer text-left text-left text-left text-left text-left text-left text-left text-left"><input type="file" accept="image/*" className="hidden" id="enroll-img-sc" onChange={e => handleImageUpload(e, (res) => setStudentForm({...studentForm, profileImage: res}))} /><label htmlFor="enroll-img-sc" className="block w-24 h-24 rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden bg-gray-50 text-left text-left text-left text-left text-left text-left text-left text-left">{studentForm.profileImage ? <img src={studentForm.profileImage} className="w-full h-full object-cover text-left" alt="" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 text-left text-left text-left text-left text-left text-left text-left">Photo</div>}</label></div></div>
-                        <input className="input-field sm:col-span-2 text-left" placeholder="Name" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} required /><input className="input-field text-left" placeholder="Reg No" value={studentForm.registrationNo} onChange={e => setStudentForm({...studentForm, registrationNo: e.target.value})} required /><input type="date" className="input-field text-left text-left" value={studentForm.dob} onChange={e => setStudentForm({...studentForm, dob: e.target.value})} required /><input type="email" className="input-field text-left" placeholder="Email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} required /><input className="input-field text-left" placeholder="Mobile" value={studentForm.mobileNo} onChange={e => setStudentForm({...studentForm, mobileNo: e.target.value})} required /><input className="input-field" placeholder="Parent" value={studentForm.parentMobileNo} onChange={e => setStudentForm({...studentForm, parentMobileNo: e.target.value})} required /><select className="input-field sm:col-span-2 text-left" value={studentForm.batchId} onChange={e => setStudentForm({...studentForm, batchId: e.target.value})} required><option value="">Batch</option>{batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}</select><button type="submit" className="sm:col-span-2 w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase shadow-xl text-left text-left text-left text-left text-left">Confirm</button>
+                        <div className="sm:col-span-2 flex justify-center mb-4 text-left text-left text-left text-left text-left text-left"><div className="relative group cursor-pointer text-left text-left text-left text-left text-left text-left text-left text-left"><input type="file" accept="image/*" className="hidden" id="enroll-img-sc" onChange={e => handleImageUpload(e, (res) => setStudentForm({...studentForm, profileImage: res}))} /><label htmlFor="enroll-img-sc" className="block w-24 h-24 rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden bg-gray-50 text-left text-left text-left text-left text-left text-left text-left text-left text-left">{studentForm.profileImage ? <img src={studentForm.profileImage} className="w-full h-full object-cover text-left" alt="" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 text-left text-left text-left text-left text-left text-left text-left">Photo</div>}</label></div></div>
+                        <input className="input-field sm:col-span-2 text-left" placeholder="Name" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} required /><input className="input-field text-left" placeholder="Reg No" value={studentForm.registrationNo} onChange={e => setStudentForm({...studentForm, registrationNo: e.target.value})} required /><input type="date" className="input-field text-left text-left" value={studentForm.dob} onChange={e => setStudentForm({...studentForm, dob: e.target.value})} required /><input type="email" className="input-field text-left" placeholder="Email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} required /><input className="input-field text-left" placeholder="Mobile" value={studentForm.mobileNo} onChange={e => setStudentForm({...studentForm, mobileNo: e.target.value})} required /><input className="input-field" placeholder="Parent" value={studentForm.parentMobileNo} onChange={e => setStudentForm({...studentForm, parentMobileNo: e.target.value})} required /><select className="input-field sm:col-span-2 text-left" value={studentForm.batchId} onChange={e => setStudentForm({...studentForm, batchId: e.target.value})} required><option value="">Batch</option>{batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}</select>
+                        <textarea className="input-field sm:col-span-2 text-left" placeholder="Residential Address" value={studentForm.address || ''} onChange={e => setStudentForm({...studentForm, address: e.target.value})} />
+                        <button type="submit" className="sm:col-span-2 w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase shadow-xl text-left text-left text-left text-left text-left">Confirm</button>
                      </form>
                   </div>
                </div>
@@ -692,7 +726,7 @@ function StaffDashboard() {
                           console.error(err);
                           alert("Failed to update student: " + err.message);
                        }
-                    }} className="grid grid-cols-1 gap-4 text-left text-left text-left text-left text-left"><input className="input-field text-left" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} /><input className="input-field text-left" value={editingStudent.registrationNo} onChange={e => setEditingStudent({...editingStudent, registrationNo: e.target.value})} /><input type="date" className="input-field text-left" value={editingStudent.dob || ''} onChange={e => setEditingStudent({...editingStudent, dob: e.target.value})} /><input className="input-field text-left" value={editingStudent.email || ''} onChange={e => setEditingStudent({...editingStudent, email: e.target.value})} /><input className="input-field text-left" value={editingStudent.mobileNo || ''} onChange={e => setEditingStudent({...editingStudent, mobileNo: e.target.value})} /><input className="input-field text-left" value={editingStudent.parentMobileNo || ''} onChange={e => setEditingStudent({...editingStudent, parentMobileNo: e.target.value})} placeholder="Parent Mobile" /><button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-left text-left text-left">Save Changes</button></form>
+                    }} className="grid grid-cols-1 gap-4 text-left text-left text-left text-left text-left"><input className="input-field text-left" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} /><input className="input-field text-left" value={editingStudent.registrationNo} onChange={e => setEditingStudent({...editingStudent, registrationNo: e.target.value})} /><input type="date" className="input-field text-left" value={editingStudent.dob || ''} onChange={e => setEditingStudent({...editingStudent, dob: e.target.value})} /><input className="input-field text-left" value={editingStudent.email || ''} onChange={e => setEditingStudent({...editingStudent, email: e.target.value})} /><input className="input-field text-left" value={editingStudent.mobileNo || ''} onChange={e => setEditingStudent({...editingStudent, mobileNo: e.target.value})} /><input className="input-field text-left" value={editingStudent.parentMobileNo || ''} onChange={e => setEditingStudent({...editingStudent, parentMobileNo: e.target.value})} placeholder="Parent Mobile" /><textarea className="input-field text-left" placeholder="Residential Address" value={editingStudent.address || ''} onChange={e => setEditingStudent({...editingStudent, address: e.target.value})} /><button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-left text-left text-left">Save Changes</button>{isAdmin && (<button type="button" onClick={async () => { if(window.confirm('PERMANENTLY DELETE STUDENT? This cannot be undone.')) { await removeUserMutation({id: editingStudent._id}); alert('Removed'); setEditingStudent(null); }}} className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-rose-100 hover:bg-rose-600 hover:text-white transition-all">Permanently Delete Student</button>)}</form>
                  </div>
                  <div className="lg:col-span-7 space-y-8 text-left text-left text-left text-left text-left text-left text-left"><h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] text-left text-left text-left text-left text-left">Attendance Timeline</h4><div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><StudentAttendanceHistoryEditor studentId={editingStudent._id} onMark={markAttendanceMutation} /></div></div>
               </div>

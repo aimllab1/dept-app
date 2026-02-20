@@ -3,18 +3,25 @@ import { v } from "convex/values";
 
 export const addSubject = mutation({
   args: {
+    requesterId: v.string(),
     name: v.string(),
     code: v.string(),
     semester: v.number(),
     staffId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("subjects", args);
+    const { requesterId, ...subjectData } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
+    return await ctx.db.insert("subjects", subjectData);
   },
 });
 
 export const updateSubject = mutation({
   args: {
+    requesterId: v.string(),
     id: v.id("subjects"),
     name: v.string(),
     code: v.string(),
@@ -22,14 +29,22 @@ export const updateSubject = mutation({
     staffId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const { id, ...details } = args;
+    const { requesterId, id, ...details } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
     await ctx.db.patch(id, details);
   },
 });
 
 export const removeSubject = mutation({
-  args: { id: v.id("subjects") },
+  args: { requesterId: v.string(), id: v.id("subjects") },
   handler: async (ctx, args) => {
+    if (args.requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(args.requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
     await ctx.db.delete(args.id);
   },
 });
@@ -52,4 +67,11 @@ export const getSubjectsByStaff = query({
       .withIndex("by_staff", (q) => q.eq("staffId", args.staffId))
       .collect();
   },
+});
+
+export const getSubjectsBySemester = query({
+  args: { semester: v.number() },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("subjects").withIndex("by_semester", q => q.eq("semester", args.semester)).collect();
+  }
 });

@@ -3,15 +3,16 @@ import { v } from "convex/values";
 
 export const createBatch = mutation({
   args: {
+    requesterId: v.string(),
     name: v.string(),
     startYear: v.number(),
     endYear: v.number(),
-    loggedInUserRole: v.string(), // For authorization
   },
   handler: async (ctx, args) => {
-    // Authorization check: Only HODs can create batches
-    if (args.loggedInUserRole !== "hod") {
-      throw new Error("Only HODs can create new batches.");
+    const { requesterId, ...batchData } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
     }
 
     // Check if batch with the same name already exists

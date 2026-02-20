@@ -11,6 +11,7 @@
 import type * as announcements from "../announcements.js";
 import type * as attendance from "../attendance.js";
 import type * as batches from "../batches.js";
+import type * as internal_auth from "../internal_auth.js";
 import type * as marks from "../marks.js";
 import type * as results from "../results.js";
 import type * as subjects from "../subjects.js";
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   announcements: typeof announcements;
   attendance: typeof attendance;
   batches: typeof batches;
+  internal_auth: typeof internal_auth;
   marks: typeof marks;
   results: typeof results;
   subjects: typeof subjects;

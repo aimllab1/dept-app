@@ -12,6 +12,7 @@ export default defineSchema({
     parentMobileNo: v.optional(v.string()),
     email: v.optional(v.string()),
     profileImage: v.optional(v.string()),
+    address: v.optional(v.string()),
   })
   .index("by_registrationNo", ["registrationNo"])
   .index("by_name", ["name"])
@@ -77,6 +78,7 @@ export default defineSchema({
     description: v.string(),
     type: v.string(), 
     imageUrl: v.optional(v.string()),
+    eventUrl: v.optional(v.string()),
     postedBy: v.string(),
     createdAt: v.number(),
   })

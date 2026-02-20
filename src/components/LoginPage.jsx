@@ -54,9 +54,9 @@ function LoginPage() {
       localStorage.setItem('aec_user', JSON.stringify(user));
 
       if (user.role === 'student') {
-        navigate('/student-dashboard', { state: { user } });
+        navigate('/student-dashboard', { state: { user }, replace: true });
       } else {
-        navigate('/staff-dashboard', { state: { user } });
+        navigate('/staff-dashboard', { state: { user }, replace: true });
       }
     } else {
       alert('Invalid credentials');
