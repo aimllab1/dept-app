@@ -2,6 +2,25 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { checkAdminAccess, ADMIN_PROFILE } from "./internal_auth";
 
+const clampSemester = (semester: number) => Math.max(1, Math.min(8, semester));
+
+const getCurrentSemesterFromBatchYear = (startYear?: number | null) => {
+  if (!startYear) return 1;
+  const now = new Date();
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  const academicYear = curYear - startYear + (curMonth >= 6 ? 1 : 0);
+  const isEvenSemester = curMonth >= 1 && curMonth <= 5;
+  const computedSemester = academicYear * 2 - (isEvenSemester ? 0 : 1);
+  return clampSemester(computedSemester);
+};
+
+const resolveCurrentSemester = (storedSemester?: number, batchStartYear?: number | null) => {
+  const enrollmentSemester = clampSemester(storedSemester ?? 1);
+  const computedSemester = getCurrentSemesterFromBatchYear(batchStartYear);
+  return Math.max(enrollmentSemester, computedSemester);
+};
+
 export const logIn = query({
   args: {
     userType: v.string(),
@@ -116,9 +135,11 @@ export const getStudents = query({
       const enrolls = await ctx.db.query("enrollments").withIndex("by_studentId", (q) => q.eq("studentId", student._id)).collect();
       const enrollment = enrolls.sort((a, b) => b.semester - a.semester)[0];
       let batchName = null;
+      let batchStartYear: number | null = null;
       if (enrollment?.batchId) {
         const batch = await ctx.db.get(enrollment.batchId);
         batchName = batch?.name;
+        batchStartYear = batch?.startYear ?? null;
       }
       let profileImage = null;
       if (student.profileImage) {
@@ -128,7 +149,13 @@ export const getStudents = query({
           profileImage = await ctx.storage.getUrl(student.profileImage);
         }
       }
-      return { ...student, profileImage, currentBatch: batchName, currentSemester: enrollment?.semester || 1, enrollmentId: enrollment?._id };
+      return {
+        ...student,
+        profileImage,
+        currentBatch: batchName,
+        currentSemester: resolveCurrentSemester(enrollment?.semester, batchStartYear),
+        enrollmentId: enrollment?._id,
+      };
     }));
   },
 });
@@ -194,16 +221,18 @@ export const getStudentById = query({
     const enrolls = await ctx.db.query("enrollments").withIndex("by_studentId", (q) => q.eq("studentId", student._id)).collect();
     const enrollment = enrolls.sort((a, b) => b.semester - a.semester)[0];
     let batchName = null;
+    let batchStartYear: number | null = null;
     if (enrollment?.batchId) {
       const batch = await ctx.db.get(enrollment.batchId);
       batchName = batch?.name;
+      batchStartYear = batch?.startYear ?? null;
     }
 
     return { 
       ...student, 
       profileImage, 
       currentBatch: batchName, 
-      currentSemester: enrollment?.semester || 1 
+      currentSemester: resolveCurrentSemester(enrollment?.semester, batchStartYear),
     };
   },
 });
