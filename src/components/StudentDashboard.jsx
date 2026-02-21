@@ -11,7 +11,7 @@ function StudentDashboard() {
   const navigate = useNavigate();
   
   const [initialUser] = useState(() => {
-    return location.state?.user || JSON.parse(localStorage.getItem('aec_user'));
+    return location.state?.user || JSON.parse(localStorage.getItem('apec_user'));
   });
 
   const user = useQuery(api.users.getStudentById, initialUser?._id ? { id: initialUser._id } : "skip") || initialUser;
@@ -71,7 +71,7 @@ function StudentDashboard() {
   if (!user) return null;
 
   const handleLogout = () => {
-    localStorage.removeItem('aec_user');
+    localStorage.removeItem('apec_user');
     window.location.href = '/login';
   };
 

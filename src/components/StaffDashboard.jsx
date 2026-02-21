@@ -10,7 +10,7 @@ function StaffDashboard() {
   const convex = useConvex();
   
   const [loggedInUser] = useState(() => {
-    return location.state?.user || JSON.parse(localStorage.getItem('aec_user'));
+    return location.state?.user || JSON.parse(localStorage.getItem('apec_user'));
   });
   const isAdmin = loggedInUser?.role === 'hod' || loggedInUser?.role === 'ahod';
 
@@ -173,7 +173,7 @@ function StaffDashboard() {
   const markAsRead = useMutation(api.notifications.markAsRead);
 
   // Handlers
-  const handleLogout = () => { localStorage.removeItem('aec_user'); window.location.href = '/login'; };
+  const handleLogout = () => { localStorage.removeItem('apec_user'); window.location.href = '/login'; };
   const handleMarkAllPresent = () => { const newMap = { ...localAttendance }; filteredAttendanceStudents.forEach(s => { newMap[s._id] = 'present'; }); setLocalAttendance(newMap); };
   const handleSubmitAttendance = async () => { if (!window.confirm('Submit attendance?')) return; for (const [sid, status] of Object.entries(localAttendance)) { await markAttendanceMutation({ studentId: sid, date: attendanceDate, status }); } alert('Submitted!'); };
   

@@ -53,7 +53,7 @@ function LoginPage() {
       setThreeDigitCode('');
       setPassword('');
       setStaffName('');
-      localStorage.setItem('aec_user', JSON.stringify(user));
+      localStorage.setItem('apec_user', JSON.stringify(user));
 
       if (user.role === 'student') {
         navigate('/student-dashboard', { state: { user }, replace: true });
