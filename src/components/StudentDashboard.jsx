@@ -15,13 +15,26 @@ function StudentDashboard() {
   });
 
   const user = useQuery(api.users.getStudentById, initialUser?._id ? { id: initialUser._id } : "skip") || initialUser;
+  
+  // Semester selection state
+  const [viewSemester, setViewSem] = useState(null);
+
+  // Initialize viewSemester once user data is loaded
+  useEffect(() => {
+    if (user?.currentSemester && viewSemester === null) {
+      setViewSem(user.currentSemester);
+    }
+  }, [user, viewSemester]);
+
   const marks = useQuery(api.marks.getMarksForStudent, user?._id ? { studentId: user._id } : "skip") || [];
-  const currentSemesterSubjects = useQuery(api.subjects.getSubjectsBySemester, user?.currentSemester ? { semester: user.currentSemester } : "skip") || [];
+  
+  // Use selected semester for subjects
+  const currentSemesterSubjects = useQuery(api.subjects.getSubjectsBySemester, viewSemester ? { semester: viewSemester } : "skip") || [];
+  
   const officialNews = useQuery(api.announcements.getAnnouncements) || [];
   const notifications = useQuery(api.notifications.getNotifications, user?._id ? { userId: user._id } : "skip") || [];
   const markAsRead = useMutation(api.notifications.markAsRead);
 
-  // All attendance for overall percentage
   const allAttendance = useQuery(api.attendance.getAttendanceForStudent, user?._id ? { studentId: user._id } : "skip") || [];
 
   const [showSubjects, setShowSubjects] = useState(false);
@@ -30,6 +43,12 @@ function StudentDashboard() {
   const [showChartOptions, setShowChartOptions] = useState(false);
 
   const activeNotifications = notifications.filter(n => !n.isRead);
+
+  // Clear selected subject if it's not in the new semester
+  useEffect(() => {
+    setSelectedSubjectForChart(null);
+    setShowChartOptions(false);
+  }, [viewSemester]);
 
   useEffect(() => {
     if (!initialUser) {
@@ -41,7 +60,6 @@ function StudentDashboard() {
   const attendanceStats = useMemo(() => {
     let relevantAttendance = allAttendance;
     
-    // Filter by startDate if set by HOD
     if (user?.startDate) {
       relevantAttendance = allAttendance.filter(a => a.date >= user.startDate);
     }
@@ -84,7 +102,7 @@ function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans text-left">
       {/* 🚀 APEC PROFILE HEADER */}
       <nav className="bg-white/90 backdrop-blur-2xl border-b border-gray-100 sticky top-0 z-50 h-24 sm:h-28">
         <div className="max-w-5xl mx-auto px-6 h-full flex justify-between items-center relative">
@@ -107,9 +125,11 @@ function StudentDashboard() {
 
           <div className="absolute left-1/2 -translate-x-1/2 text-center w-full max-w-[45%]">
             <h2 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none truncate">{user.name}</h2>
-            <p className="text-[9px] sm:text-[11px] font-black text-blue-600 tracking-[0.3em] mt-2 uppercase">
-              {getYearRoman(user?.currentSemester)} • APEC • {user.registrationNo}
-            </p>
+            <div className="flex items-center justify-center space-x-2 mt-2">
+               <p className="text-[9px] sm:text-[11px] font-black text-blue-600 tracking-[0.3em] uppercase">
+                 {getYearRoman(user?.currentSemester)} • APEC • {user.registrationNo}
+               </p>
+            </div>
           </div>
 
           <button onClick={handleLogout} className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center space-x-2">
@@ -146,16 +166,32 @@ function StudentDashboard() {
 
       <main className="max-w-3xl mx-auto py-12 px-6 space-y-12">
         
+        {/* 🎓 SEMESTER SELECTOR */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-xl">
+           <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest ml-4">Viewing Records for:</h3>
+           <div className="flex flex-wrap justify-center gap-2">
+              {[1,2,3,4,5,6,7,8].map(s => (
+                <button 
+                  key={s} 
+                  onClick={() => setViewSem(s)}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all ${viewSemester === s ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                >
+                  SEM {s}
+                </button>
+              ))}
+           </div>
+        </div>
+
         {/* 📊 ATTENDANCE ANALYTICS CARD */}
-        <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 relative overflow-hidden">
+        <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 relative overflow-hidden text-left">
            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-           <div className="flex justify-between items-start mb-10 relative z-10">
-              <div>
-                <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter flex items-center">
+           <div className="flex justify-between items-start mb-10 relative z-10 text-left">
+              <div className="text-left">
+                <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter flex items-center text-left">
                    <Activity className="w-6 h-6 text-emerald-500 mr-4" />
                    Attendance Portal
                 </h3>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 ml-10">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 ml-10 text-left">
                   {user.startDate ? `Calculating from: ${new Date(user.startDate).toLocaleDateString()}` : "Comprehensive History"}
                 </p>
               </div>
@@ -176,7 +212,7 @@ function StudentDashboard() {
               </div>
               <div className="h-12 w-[1px] bg-gray-100"></div>
               <div className="text-right">
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Academic Standing</p>
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 text-right">Academic Standing</p>
                  <span className={`text-[10px] font-black uppercase px-4 py-2 rounded-full ${parseFloat(attendanceStats.percentage) < 75 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                     {parseFloat(attendanceStats.percentage) < 75 ? 'Low Attendance' : 'Satisfactory'}
                  </span>
@@ -189,42 +225,46 @@ function StudentDashboard() {
         </div>
 
         {/* 📊 PERFORMANCE ANALYTICS */}
-        <div className="space-y-6">
+        <div className="space-y-6 text-left">
            {!showChartOptions && !selectedSubjectForChart ? (
              <button onClick={() => setShowChartOptions(true)} className="w-full py-12 bg-white shadow-2xl rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-4 group hover:bg-blue-600 transition-all duration-700">
                 <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
                   <TrendingUp className="w-8 h-8 text-blue-600 group-hover:text-white" />
                 </div>
-                <span className="text-sm font-black text-gray-900 uppercase tracking-[0.3em] group-hover:text-white">Academic Performance</span>
+                <span className="text-sm font-black text-gray-900 uppercase tracking-[0.3em] group-hover:text-white">Semester {viewSemester} Marks</span>
              </button>
            ) : (
-             <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 overflow-hidden animate-fade-in">
-                <div className="flex justify-between items-center mb-10">
-                   <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter flex items-center">
+             <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 overflow-hidden animate-fade-in text-left">
+                <div className="flex justify-between items-center mb-10 text-left">
+                   <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter flex items-center text-left">
                       <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mr-5">
                         <TrendingUp className="w-5 h-5 text-blue-600" />
                       </div>
-                      {selectedSubjectForChart ? selectedSubjectForChart.name : "Select Subject"}
+                      {selectedSubjectForChart ? selectedSubjectForChart.name : `Select Sem ${viewSemester} Subject`}
                    </h3>
-                   <button onClick={() => { setSelectedSubjectForChart(null); setShowChartOptions(true); }} className="px-5 py-2 bg-gray-50 rounded-full text-[9px] font-black text-blue-600 uppercase tracking-widest">Change</button>
+                   <button onClick={() => { setSelectedSubjectForChart(null); setShowChartOptions(true); }} className="px-5 py-2 bg-gray-50 rounded-full text-[9px] font-black text-blue-600 uppercase tracking-widest hover:bg-blue-50 transition-colors">Change</button>
                 </div>
 
                 {showChartOptions && (
-                  <div className="grid grid-cols-1 gap-4 mb-10">
-                     {currentSemesterSubjects.map(sub => (
-                       <button key={sub._id} onClick={() => { setSelectedSubjectForChart(sub); setShowChartOptions(false); }} className="p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-blue-600 hover:bg-white transition-all flex justify-between items-center group">
-                          <div className="text-left">
-                            <p className="font-black text-gray-900 text-sm uppercase tracking-tight">{sub.name}</p>
-                            <p className="text-[10px] font-black text-blue-600 uppercase mt-1 opacity-60">{sub.code}</p>
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
-                       </button>
-                     ))}
+                  <div className="grid grid-cols-1 gap-4 mb-10 text-left">
+                     {currentSemesterSubjects.length === 0 ? (
+                       <div className="p-10 text-center text-gray-300 font-black uppercase text-[10px]">No subjects found for Semester {viewSemester}</div>
+                     ) : (
+                       currentSemesterSubjects.map(sub => (
+                         <button key={sub._id} onClick={() => { setSelectedSubjectForChart(sub); setShowChartOptions(false); }} className="p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-blue-600 hover:bg-white transition-all flex justify-between items-center group text-left">
+                            <div className="text-left">
+                              <p className="font-black text-gray-900 text-sm uppercase tracking-tight text-left">{sub.name}</p>
+                              <p className="text-[10px] font-black text-blue-600 uppercase mt-1 opacity-60 text-left">{sub.code}</p>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
+                         </button>
+                       ))
+                     )}
                   </div>
                 )}
 
                 {selectedSubjectForChart && (
-                  <div className="space-y-12">
+                  <div className="space-y-12 text-left">
                     {chartData.length > 0 ? (
                       <>
                         <div className="h-72 w-full">
@@ -266,17 +306,17 @@ function StudentDashboard() {
                               </AreaChart>
                            </ResponsiveContainer>
                         </div>
-                        <div className="space-y-4 pt-10 border-t border-gray-50">
+                        <div className="space-y-4 pt-10 border-t border-gray-50 text-left">
                            {marks.filter(m => m.subjectId === selectedSubjectForChart._id).map((m, i) => (
-                               <div key={i} className="flex justify-between items-center bg-gray-50 p-6 rounded-3xl border border-gray-100">
-                                  <div><p className="text-xs font-black text-gray-900 uppercase">{m.testType}</p></div>
+                               <div key={i} className="flex justify-between items-center bg-gray-50 p-6 rounded-3xl border border-gray-100 text-left">
+                                  <div className="text-left"><p className="text-xs font-black text-gray-900 uppercase text-left">{m.testType}</p></div>
                                   <div className={`text-xl font-black ${parseInt(m.score) < 50 ? 'text-rose-600' : 'text-emerald-600'}`}>{m.score}</div>
                                </div>
                            ))}
                         </div>
                       </>
                     ) : (
-                      <div className="py-20 text-center"><p className="text-[11px] font-black text-gray-300 uppercase tracking-widest">No subject marks recorded</p></div>
+                      <div className="py-20 text-center text-left"><p className="text-[11px] font-black text-gray-300 uppercase tracking-widest text-center">No subject marks recorded</p></div>
                     )}
                   </div>
                 )}
@@ -285,22 +325,22 @@ function StudentDashboard() {
         </div>
 
         {/* 📢 NEWS FEED */}
-        <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100">
-           <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-10 ml-2">Campus Bulletin</h4>
-           <div className="space-y-12">
+        <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 text-left">
+           <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-10 ml-2 text-left">Campus Bulletin</h4>
+           <div className="space-y-12 text-left">
               {officialNews.slice(0, 5).map(event => (
-                <div key={event._id} className="group">
-                   <div className="flex items-center justify-between mb-5">
-                      <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-100">{event.type}</span>
-                      <p className="text-[9px] font-black text-gray-300 uppercase">{new Date(event.createdAt).toLocaleDateString()}</p>
+                <div key={event._id} className="group text-left">
+                   <div className="flex items-center justify-between mb-5 text-left">
+                      <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-100 text-left">{event.type}</span>
+                      <p className="text-[9px] font-black text-gray-300 uppercase text-left">{new Date(event.createdAt).toLocaleDateString()}</p>
                    </div>
                    {event.imageUrl && (
-                     <div className="relative aspect-video mb-6 overflow-hidden rounded-[2rem] shadow-lg border border-gray-100">
-                       <img src={event.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                     <div className="relative aspect-video mb-6 overflow-hidden rounded-[2rem] shadow-lg border border-gray-100 text-left">
+                       <img src={event.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 text-left" />
                      </div>
                    )}
-                   <h4 className="font-black text-xl text-gray-900 uppercase tracking-tight leading-tight mb-4 group-hover:text-blue-600 transition-colors">{event.title}</h4>
-                   <p className="text-sm font-bold text-gray-500 leading-relaxed mb-6">{event.description}</p>
+                   <h4 className="font-black text-xl text-gray-900 uppercase tracking-tight leading-tight mb-4 group-hover:text-blue-600 transition-colors text-left">{event.title}</h4>
+                   <p className="text-sm font-bold text-gray-500 leading-relaxed mb-6 text-left">{event.description}</p>
                 </div>
               ))}
            </div>
