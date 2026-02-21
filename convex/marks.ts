@@ -78,7 +78,12 @@ export const getMarksForStudent = query({
     
     return await Promise.all(marks.map(async (m) => {
       const subject = await ctx.db.get(m.subjectId);
-      return { ...m, subjectName: subject?.name, subjectCode: subject?.code };
+      return { 
+        ...m, 
+        subjectName: subject?.name, 
+        subjectCode: subject?.code,
+        semester: subject?.semester 
+      };
     }));
   },
 });

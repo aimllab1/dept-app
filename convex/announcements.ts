@@ -26,11 +26,23 @@ export const postAnnouncement = mutation({
 
 export const getAnnouncements = query({
   handler: async (ctx) => {
-    return await ctx.db
+    const news = await ctx.db
       .query("announcements")
       .withIndex("by_createdAt")
       .order("desc")
       .take(10);
+    
+    return await Promise.all(news.map(async (n) => {
+      let imageUrl = null;
+      if (n.imageUrl) {
+        if (n.imageUrl.startsWith("data:")) {
+          imageUrl = n.imageUrl;
+        } else {
+          imageUrl = await ctx.storage.getUrl(n.imageUrl);
+        }
+      }
+      return { ...n, imageUrl };
+    }));
   },
 });
 

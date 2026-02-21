@@ -28,18 +28,24 @@ export const markAttendance = mutation({
   args: {
     studentId: v.id("users"),
     date: v.string(), // YYYY-MM-DD
-    status: v.union(v.literal("present"), v.literal("absent"), v.literal("leave"), v.literal("od")),
+    status: v.union(v.literal("present"), v.literal("absent"), v.literal("leave"), v.literal("od"), v.literal("holiday")),
   },
   handler: async (ctx, args) => {
-    const existingRecord = await ctx.db
+    const existingRecords = await ctx.db
       .query("attendance")
       .withIndex("by_student_date", (q) =>
         q.eq("studentId", args.studentId).eq("date", args.date)
       )
-      .unique();
+      .collect();
 
-    if (existingRecord) {
-      await ctx.db.patch(existingRecord._id, { status: args.status });
+    if (existingRecords.length > 0) {
+      // Keep the newest record and remove any accidental duplicates.
+      existingRecords.sort((a, b) => b._creationTime - a._creationTime);
+      const [latestRecord, ...duplicates] = existingRecords;
+      await ctx.db.patch(latestRecord._id, { status: args.status });
+      for (const duplicate of duplicates) {
+        await ctx.db.delete(duplicate._id);
+      }
     } else {
       await ctx.db.insert("attendance", {
         studentId: args.studentId,
@@ -59,19 +65,28 @@ export const getAttendanceForStudent = query({
     let q = ctx.db
       .query("attendance")
       .withIndex("by_student_date", (q) => q.eq("studentId", args.studentId));
-    
-    if (args.month) {
-      return await q
+
+    const records = args.month
+      ? await q
         .filter(q => 
           q.and(
             q.gte(q.field("date"), `${args.month}-01`),
             q.lte(q.field("date"), `${args.month}-31`)
           )
         )
-        .collect();
+        .collect()
+      : await q.collect();
+
+    // De-duplicate by date and keep the latest write.
+    const latestByDate = new Map();
+    for (const record of records) {
+      const previous = latestByDate.get(record.date);
+      if (!previous || record._creationTime > previous._creationTime) {
+        latestByDate.set(record.date, record);
+      }
     }
-    
-    return await q.collect();
+
+    return Array.from(latestByDate.values());
   },
 });
 
@@ -83,12 +98,14 @@ export const getAttendanceByDate = query({
       .withIndex("by_date", (q) => q.eq("date", args.date))
       .collect();
     
-    // De-duplicate to only keep the latest record for each student
+    // De-duplicate to only keep the latest record for each student.
     const latestMap = new Map();
-    records.sort((a, b) => a._creationTime - b.creationTime); // Process in order of creation
-    records.forEach(r => {
-      latestMap.set(r.studentId, r);
-    });
+    for (const record of records) {
+      const previous = latestMap.get(record.studentId);
+      if (!previous || record._creationTime > previous._creationTime) {
+        latestMap.set(record.studentId, record);
+      }
+    }
     
     return Array.from(latestMap.values());
   },

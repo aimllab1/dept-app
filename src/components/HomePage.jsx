@@ -33,11 +33,11 @@ function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-24 flex items-center justify-between">
           <div className="flex items-center space-x-3 sm:space-x-6">
             <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-md border border-gray-50">
-              <img src="/img/logo.png" alt="AEC Logo" className="h-10 sm:h-16 w-auto object-contain" />
+              <img src="/img/logo.png" alt="APEC Logo" className="h-10 sm:h-16 w-auto object-contain" />
             </div>
             <div className="text-left">
               <h1 className="text-sm sm:text-base lg:text-xl font-black tracking-tight text-gray-900 leading-none">
-                ADHIPARASAKTHI <span className="hidden xs:inline">ENGINEERING COLLEGE</span>
+                ADHIPARASAKTHI <span className="hidden xs:inline">ENGINEERING COLLEGE</span> (APEC)
               </h1>
               <p className="text-[8px] sm:text-[10px] lg:text-xs font-bold text-blue-600 tracking-[0.1em] sm:tracking-[0.2em] mt-1 uppercase">
                 Melmaruvathur, Tamil Nadu
@@ -45,7 +45,7 @@ function HomePage() {
             </div>
           </div>
           <div className="flex items-center">
-             <Link to="/login" className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-8 py-2 sm:py-3 rounded-full font-black text-[10px] sm:text-xs tracking-widest transition-all shadow-xl hover:shadow-blue-200 active:scale-95">
+             <Link to="/login" state={{ userType: 'student' }} className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-8 py-2 sm:py-3 rounded-full font-black text-[10px] sm:text-xs tracking-widest transition-all shadow-xl hover:shadow-blue-200 active:scale-95">
                LOGIN
              </Link>
           </div>
@@ -66,7 +66,7 @@ function HomePage() {
             </span>
           </h2>
           <p className="max-w-2xl mx-auto text-sm sm:text-lg text-gray-500 leading-relaxed mb-10 sm:mb-12 px-2">
-            Pioneering digital excellence at AEC through advanced AI research and professional engineering education.
+            Pioneering digital excellence at APEC through advanced AI research and professional engineering education.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 max-w-4xl mx-auto mb-12 sm:mb-20 px-2">
@@ -148,8 +148,8 @@ function HomePage() {
       {/* Footer */}
       <footer className="w-full bg-gray-50 py-12 sm:py-16 px-6 sm:px-8 border-t border-gray-100 text-center">
         <div className="max-w-7xl mx-auto flex flex-col items-center">
-          <img src="/img/logo.png" alt="AEC" className="h-8 sm:h-10 mb-6 grayscale opacity-50" />
-          <h2 className="text-[10px] sm:text-xs font-black text-gray-900 mb-2 tracking-tight uppercase">ADHIPARASAKTHI ENGINEERING COLLEGE</h2>
+          <img src="/img/logo.png" alt="APEC" className="h-8 sm:h-10 mb-6 grayscale opacity-50" />
+          <h2 className="text-[10px] sm:text-xs font-black text-gray-900 mb-2 tracking-tight uppercase">ADHIPARASAKTHI ENGINEERING COLLEGE (APEC)</h2>
           <p className="text-[8px] sm:text-[10px] text-gray-500 font-bold max-w-sm mb-8 sm:mb-10 tracking-widest uppercase px-4">
             Melmaruvathur - 603319. CSE (AIML) Department
           </p>

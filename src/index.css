@@ -1,21 +1,44 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Tw Cen MT Bold", "Tw Cen MT", "Arial Bold", "Arial", sans-serif;
+  --font-serif: "Times New Roman", Times, serif;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    font-weight: bold;
+  }
+
+  p, span, div, input, button {
+    font-family: var(--font-sans);
+  }
+
+  .serif-text {
+    font-family: var(--font-serif);
+  }
+}
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light;
-  color: #1f2937; /* gray-800 */
-  background-color: #f3f4f6; /* gray-100 */
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  background-color: #f9fafb;
+  color: #111827;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+}
+
+/* Custom font face declarations if local files exist, otherwise fallback to system bold */
+@font-face {
+  font-family: 'Tw Cen MT Bold';
+  src: local('Tw Cen MT Bold'), local('TwCenMT-Bold');
+  font-weight: bold;
 }

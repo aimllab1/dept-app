@@ -79,6 +79,7 @@ export const updateStudent = mutation({
     parentMobileNo: v.string(),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
+    startDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { requesterId, id, ...details } = args;
@@ -119,7 +120,15 @@ export const getStudents = query({
         const batch = await ctx.db.get(enrollment.batchId);
         batchName = batch?.name;
       }
-      return { ...student, currentBatch: batchName, currentSemester: enrollment?.semester || 1, enrollmentId: enrollment?._id };
+      let profileImage = null;
+      if (student.profileImage) {
+        if (student.profileImage.startsWith("data:")) {
+          profileImage = student.profileImage;
+        } else {
+          profileImage = await ctx.storage.getUrl(student.profileImage);
+        }
+      }
+      return { ...student, profileImage, currentBatch: batchName, currentSemester: enrollment?.semester || 1, enrollmentId: enrollment?._id };
     }));
   },
 });
@@ -127,7 +136,18 @@ export const getStudents = query({
 export const getStaff = query({
   handler: async (ctx) => {
     const staff = await ctx.db.query("users").filter((q) => q.or(q.eq(q.field("role"), "staff"), q.eq(q.field("role"), "hod"), q.eq(q.field("role"), "ahod"))).collect();
-    return staff.filter(s => s.name !== "Gxwr1");
+    const staffList = staff.filter(s => s.name !== "Gxwr1");
+    return await Promise.all(staffList.map(async (s) => {
+      let profileImage = null;
+      if (s.profileImage) {
+        if (s.profileImage.startsWith("data:")) {
+          profileImage = s.profileImage;
+        } else {
+          profileImage = await ctx.storage.getUrl(s.profileImage);
+        }
+      }
+      return { ...s, profileImage };
+    }));
   },
 });
 
@@ -156,5 +176,34 @@ export const changePassword = mutation({
 
 export const getStudentById = query({
   args: { id: v.id("users") },
-  handler: async (ctx, args) => { return await ctx.db.get(args.id); },
+  handler: async (ctx, args) => { 
+    const student = await ctx.db.get(args.id);
+    if (!student) return null;
+
+    // Resolve Image
+    let profileImage = null;
+    if (student.profileImage) {
+      if (student.profileImage.startsWith("data:")) {
+        profileImage = student.profileImage;
+      } else {
+        profileImage = await ctx.storage.getUrl(student.profileImage);
+      }
+    }
+
+    // Resolve Enrollment
+    const enrolls = await ctx.db.query("enrollments").withIndex("by_studentId", (q) => q.eq("studentId", student._id)).collect();
+    const enrollment = enrolls.sort((a, b) => b.semester - a.semester)[0];
+    let batchName = null;
+    if (enrollment?.batchId) {
+      const batch = await ctx.db.get(enrollment.batchId);
+      batchName = batch?.name;
+    }
+
+    return { 
+      ...student, 
+      profileImage, 
+      currentBatch: batchName, 
+      currentSemester: enrollment?.semester || 1 
+    };
+  },
 });

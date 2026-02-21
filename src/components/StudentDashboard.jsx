@@ -1,24 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, Navigate, useNavigate } from 'react-router-dom';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import AttendanceCalendar from './AttendanceCalendar';
+import { Bell, BellDot, TrendingUp, X, LogOut, ChevronRight, Activity } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 function StudentDashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // 1. Get initial ID from location or localStorage
   const [initialUser] = useState(() => {
     return location.state?.user || JSON.parse(localStorage.getItem('aec_user'));
   });
 
-  // 2. Fetch REAL-TIME student data using the ID
   const user = useQuery(api.users.getStudentById, initialUser?._id ? { id: initialUser._id } : "skip") || initialUser;
+  const marks = useQuery(api.marks.getMarksForStudent, user?._id ? { studentId: user._id } : "skip") || [];
+  const currentSemesterSubjects = useQuery(api.subjects.getSubjectsBySemester, user?.currentSemester ? { semester: user.currentSemester } : "skip") || [];
+  const officialNews = useQuery(api.announcements.getAnnouncements) || [];
+  const notifications = useQuery(api.notifications.getNotifications, user?._id ? { userId: user._id } : "skip") || [];
+  const markAsRead = useMutation(api.notifications.markAsRead);
 
-  // 3. Check if staff is viewing student
-  const [loggedInUser] = useState(() => JSON.parse(localStorage.getItem('aec_user')));
-  const isViewingAsStaff = loggedInUser && loggedInUser.role !== 'student' && loggedInUser._id !== user?._id;
+  // All attendance for overall percentage
+  const allAttendance = useQuery(api.attendance.getAttendanceForStudent, user?._id ? { studentId: user._id } : "skip") || [];
+
+  const [showSubjects, setShowSubjects] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedSubjectForChart, setSelectedSubjectForChart] = useState(null);
+  const [showChartOptions, setShowChartOptions] = useState(false);
+
+  const activeNotifications = notifications.filter(n => !n.isRead);
 
   useEffect(() => {
     if (!initialUser) {
@@ -26,12 +37,36 @@ function StudentDashboard() {
     }
   }, [initialUser, navigate]);
 
-  const marks = useQuery(api.marks.getMarksForStudent, user?._id ? { studentId: user._id } : "skip") || [];
-  const enrollmentData = useQuery(api.users.getStudents)?.find(s => s._id === user?._id);
-  const currentSemesterSubjects = useQuery(api.subjects.getSubjectsBySemester, enrollmentData?.currentSemester ? { semester: enrollmentData.currentSemester } : "skip") || [];
-  const officialNews = useQuery(api.announcements.getAnnouncements) || [];
-  const [visibleDescriptions, setVisibleDescriptions] = useState({});
-  const [showSubjects, setShowSubjects] = useState(false);
+  // Overall Attendance Calculation
+  const attendanceStats = useMemo(() => {
+    let relevantAttendance = allAttendance;
+    
+    // Filter by startDate if set by HOD
+    if (user?.startDate) {
+      relevantAttendance = allAttendance.filter(a => a.date >= user.startDate);
+    }
+
+    const counts = { present: 0, absent: 0, leave: 0, od: 0, holiday: 0 };
+    relevantAttendance.forEach(a => {
+      if (counts[a.status] !== undefined) counts[a.status]++;
+    });
+
+    const totalWorkingDays = counts.present + counts.absent + counts.leave + counts.od;
+    const presence = counts.present + counts.od;
+    const percentage = totalWorkingDays > 0 ? (presence / totalWorkingDays) * 100 : 0;
+
+    return { ...counts, totalWorkingDays, percentage: percentage.toFixed(2) };
+  }, [allAttendance, user?.startDate]);
+
+  const chartData = useMemo(() => {
+    if (!marks.length || !selectedSubjectForChart) return [];
+    const subjectMarks = marks.filter(m => m.subjectId === selectedSubjectForChart._id);
+    const sorted = [...subjectMarks].sort((a, b) => a.updatedAt - b.updatedAt);
+    return sorted.map(m => ({
+      name: m.testType,
+      score: parseInt(m.score),
+    }));
+  }, [marks, selectedSubjectForChart]);
 
   if (!user) return null;
 
@@ -49,146 +84,235 @@ function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans pb-20">
-      {/* 🚀 MINIMALIST PROFILE HEADER */}
-      <nav className="bg-white/80 backdrop-blur-xl border-b border-gray-100 sticky top-0 z-50 h-24 sm:h-28">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      {/* 🚀 APEC PROFILE HEADER */}
+      <nav className="bg-white/90 backdrop-blur-2xl border-b border-gray-100 sticky top-0 z-50 h-24 sm:h-28">
         <div className="max-w-5xl mx-auto px-6 h-full flex justify-between items-center relative">
-          {/* Profile Pic - Left */}
-          <div className="flex items-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-blue-50">
+          <div className="flex items-center space-x-6">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-4 border-white shadow-2xl overflow-hidden bg-blue-50">
               <img src={user.profileImage || `https://ui-avatars.com/api/?name=${user.name}&background=f9fafb&color=2563eb&bold=true&size=128`} alt={user.name} className="w-full h-full object-cover" />
             </div>
+            
+            <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-3 bg-gray-50 rounded-xl hover:bg-blue-50 transition-colors group">
+               {activeNotifications.length > 0 ? (
+                 <>
+                   <BellDot className="w-6 h-6 text-rose-500 animate-bounce" />
+                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white">{activeNotifications.length}</span>
+                 </>
+               ) : (
+                 <Bell className="w-6 h-6 text-gray-400 group-hover:text-blue-600" />
+               )}
+            </button>
           </div>
 
-          {/* Name & Year - Center */}
-          <div className="absolute left-1/2 -translate-x-1/2 text-center w-full max-w-[50%]">
-            <h2 className="text-lg sm:text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none truncate">{user.name}</h2>
-            <p className="text-[10px] sm:text-xs font-black text-blue-600 tracking-[0.3em] mt-2 uppercase">
-              {getYearRoman(enrollmentData?.currentSemester)} • {user.registrationNo}
+          <div className="absolute left-1/2 -translate-x-1/2 text-center w-full max-w-[45%]">
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-tighter leading-none truncate">{user.name}</h2>
+            <p className="text-[9px] sm:text-[11px] font-black text-blue-600 tracking-[0.3em] mt-2 uppercase">
+              {getYearRoman(user?.currentSemester)} • APEC • {user.registrationNo}
             </p>
           </div>
 
-          {/* Sign Out - Right */}
-          <button onClick={handleLogout} className="bg-gray-900 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Out</button>
+          <button onClick={handleLogout} className="bg-gray-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center space-x-2">
+            <span>Logout</span>
+            <LogOut className="w-3 h-3" />
+          </button>
         </div>
-      </nav>
 
-      <main className="max-w-3xl mx-auto py-10 px-6 space-y-10">
-        
-        {/* 📢 MARQUEE UPDATES */}
-        {officialNews.length > 0 && (
-          <div className="overflow-hidden bg-blue-600 rounded-3xl shadow-xl shadow-blue-100 p-1 flex items-center">
-             <div className="bg-white text-blue-600 px-5 py-2.5 rounded-[1.25rem] font-black text-[9px] uppercase tracking-widest z-10 shadow-md shrink-0">Alerts</div>
-             <div className="flex-1 overflow-hidden whitespace-nowrap px-6">
-                <div className="inline-block animate-marquee text-white font-bold text-xs uppercase tracking-wide">
-                   {officialNews.map(n => (
-                     <span key={n._id} className="mr-12">
-                       • [{n.type}] {n.title} 
-                       {n.eventUrl && <a href={n.eventUrl} target="_blank" rel="noreferrer" className="ml-2 underline text-blue-200 text-[10px]">[Link]</a>}
-                     </span>
-                   ))}
-                </div>
+        {/* Notifications */}
+        {showNotifications && (
+          <div className="absolute top-full right-6 mt-4 w-85 bg-white rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-fade-in z-[60]">
+             <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-900">Recent Alerts</h4>
+                <button onClick={() => setShowNotifications(false)}><X className="w-4 h-4 text-gray-400" /></button>
+             </div>
+             <div className="max-h-[28rem] overflow-y-auto divide-y divide-gray-50">
+                {activeNotifications.length === 0 ? (
+                  <div className="p-16 text-center"><p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Inbox is empty</p></div>
+                ) : (
+                  activeNotifications.map(n => (
+                    <div key={n._id} onClick={() => markAsRead({ id: n._id })} className="p-6 hover:bg-blue-50/30 transition-all cursor-pointer relative group">
+                       <p className="text-[10px] font-black text-blue-600 uppercase mb-1 flex items-center">
+                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2"></span>
+                         {n.title}
+                       </p>
+                       <p className="text-xs font-bold text-gray-600 leading-relaxed">{n.message}</p>
+                    </div>
+                  ))
+                )}
              </div>
           </div>
         )}
+      </nav>
 
-        {/* 📅 ATTENDANCE - THE MAIN FOCUS */}
-        <div className="bg-white shadow-2xl rounded-[3rem] p-8 sm:p-12 border border-gray-100 overflow-hidden">
-           <div className="flex justify-between items-center mb-10">
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight flex items-center">
-                 <span className="w-1.5 h-6 bg-emerald-500 rounded-full mr-4"></span>
-                 Attendance
-              </h3>
-              <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full font-black text-[10px] uppercase border border-emerald-100">Live Status</div>
+      <main className="max-w-3xl mx-auto py-12 px-6 space-y-12">
+        
+        {/* 📊 ATTENDANCE ANALYTICS CARD */}
+        <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+           <div className="flex justify-between items-start mb-10 relative z-10">
+              <div>
+                <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter flex items-center">
+                   <Activity className="w-6 h-6 text-emerald-500 mr-4" />
+                   Attendance Portal
+                </h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 ml-10">
+                  {user.startDate ? `Calculating from: ${new Date(user.startDate).toLocaleDateString()}` : "Comprehensive History"}
+                </p>
+              </div>
+              <div className="text-right">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Percentage</p>
+                 <p className={`text-4xl font-black ${parseFloat(attendanceStats.percentage) < 75 ? 'text-rose-600' : 'text-emerald-600'}`}>{attendanceStats.percentage}%</p>
+              </div>
            </div>
-           <AttendanceCalendar studentId={user._id} />
+
+           <div className="bg-white p-8 rounded-[2.5rem] border-2 border-gray-50 flex items-center justify-between mb-10 relative z-10 shadow-sm">
+              <div className="text-left">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Presence Ratio</p>
+                 <div className="flex items-baseline space-x-2">
+                    <span className="text-3xl font-black text-gray-900">{attendanceStats.present + attendanceStats.od}</span>
+                    <span className="text-lg font-bold text-gray-300">/ {attendanceStats.totalWorkingDays}</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Days Present</span>
+                 </div>
+              </div>
+              <div className="h-12 w-[1px] bg-gray-100"></div>
+              <div className="text-right">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Academic Standing</p>
+                 <span className={`text-[10px] font-black uppercase px-4 py-2 rounded-full ${parseFloat(attendanceStats.percentage) < 75 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    {parseFloat(attendanceStats.percentage) < 75 ? 'Low Attendance' : 'Satisfactory'}
+                 </span>
+              </div>
+           </div>
+
+           <div className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100">
+              <AttendanceCalendar studentId={user._id} />
+           </div>
         </div>
 
-        {/* 📝 PERFORMANCE & NEWS FEED */}
-        <div className="space-y-8">
-           <div className="flex justify-between items-end px-4">
-              <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Activity Feed</h3>
-              <button onClick={() => setShowSubjects(!showSubjects)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b-2 border-blue-600 pb-1">{showSubjects ? 'Close Subjects' : 'My Subjects'}</button>
-           </div>
-
-           {/* Hidden Curriculum Section */}
-           {showSubjects && (
-             <div className="bg-blue-600 rounded-[2.5rem] p-8 sm:p-10 shadow-2xl shadow-blue-200 animate-fade-in text-white">
-                <h4 className="text-[10px] font-black text-blue-200 uppercase tracking-[0.3em] mb-8">Current Semester Courses</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                   {currentSemesterSubjects.map(sub => (
-                     <div key={sub._id} className="p-5 bg-white/10 rounded-3xl border border-white/10 backdrop-blur-md">
-                        <p className="font-black text-sm uppercase leading-tight">{sub.name}</p>
-                        <p className="text-[9px] font-black text-blue-200 uppercase tracking-widest mt-2">{sub.code}</p>
-                     </div>
-                   ))}
+        {/* 📊 PERFORMANCE ANALYTICS */}
+        <div className="space-y-6">
+           {!showChartOptions && !selectedSubjectForChart ? (
+             <button onClick={() => setShowChartOptions(true)} className="w-full py-12 bg-white shadow-2xl rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center space-y-4 group hover:bg-blue-600 transition-all duration-700">
+                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <TrendingUp className="w-8 h-8 text-blue-600 group-hover:text-white" />
                 </div>
+                <span className="text-sm font-black text-gray-900 uppercase tracking-[0.3em] group-hover:text-white">Academic Performance</span>
+             </button>
+           ) : (
+             <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100 overflow-hidden animate-fade-in">
+                <div className="flex justify-between items-center mb-10">
+                   <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter flex items-center">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mr-5">
+                        <TrendingUp className="w-5 h-5 text-blue-600" />
+                      </div>
+                      {selectedSubjectForChart ? selectedSubjectForChart.name : "Select Subject"}
+                   </h3>
+                   <button onClick={() => { setSelectedSubjectForChart(null); setShowChartOptions(true); }} className="px-5 py-2 bg-gray-50 rounded-full text-[9px] font-black text-blue-600 uppercase tracking-widest">Change</button>
+                </div>
+
+                {showChartOptions && (
+                  <div className="grid grid-cols-1 gap-4 mb-10">
+                     {currentSemesterSubjects.map(sub => (
+                       <button key={sub._id} onClick={() => { setSelectedSubjectForChart(sub); setShowChartOptions(false); }} className="p-6 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-blue-600 hover:bg-white transition-all flex justify-between items-center group">
+                          <div className="text-left">
+                            <p className="font-black text-gray-900 text-sm uppercase tracking-tight">{sub.name}</p>
+                            <p className="text-[10px] font-black text-blue-600 uppercase mt-1 opacity-60">{sub.code}</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
+                       </button>
+                     ))}
+                  </div>
+                )}
+
+                {selectedSubjectForChart && (
+                  <div className="space-y-12">
+                    {chartData.length > 0 ? (
+                      <>
+                        <div className="h-72 w-full">
+                           <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={chartData}>
+                                 <defs>
+                                    <linearGradient id="colorCurve" x1="0" y1="0" x2="0" y2="1">
+                                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    </linearGradient>
+                                 </defs>
+                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                 <XAxis dataKey="name" hide />
+                                 <YAxis domain={[0, 100]} hide />
+                                 <Tooltip 
+                                   contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)', fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', padding: '12px 20px' }}
+                                   cursor={{ stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5 5' }}
+                                 />
+                                 <Area 
+                                   type="monotone" 
+                                   dataKey="score" 
+                                   stroke="url(#lineGradient)" 
+                                   strokeWidth={6} 
+                                   fillOpacity={1} 
+                                   fill="url(#colorCurve)" 
+                                   animationDuration={2000}
+                                 />
+                                 <defs>
+                                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                      {chartData.map((d, i) => (
+                                        <stop 
+                                          key={i} 
+                                          offset={`${(i / (chartData.length - 1)) * 100}%`} 
+                                          stopColor={d.score >= 50 ? "#10b981" : "#f43f5e"} 
+                                        />
+                                      ))}
+                                    </linearGradient>
+                                 </defs>
+                              </AreaChart>
+                           </ResponsiveContainer>
+                        </div>
+                        <div className="space-y-4 pt-10 border-t border-gray-50">
+                           {marks.filter(m => m.subjectId === selectedSubjectForChart._id).map((m, i) => (
+                               <div key={i} className="flex justify-between items-center bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                                  <div><p className="text-xs font-black text-gray-900 uppercase">{m.testType}</p></div>
+                                  <div className={`text-xl font-black ${parseInt(m.score) < 50 ? 'text-rose-600' : 'text-emerald-600'}`}>{m.score}</div>
+                               </div>
+                           ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="py-20 text-center"><p className="text-[11px] font-black text-gray-300 uppercase tracking-widest">No subject marks recorded</p></div>
+                    )}
+                  </div>
+                )}
              </div>
            )}
+        </div>
 
-           <div className="grid grid-cols-1 gap-8">
-              {/* Combine Marks and News into one vertical list if needed, or keep cards */}
-              <div className="bg-white shadow-2xl rounded-[3rem] p-8 sm:p-10 border border-gray-100">
-                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-8 ml-4">Marks & Grades</h4>
-                 <div className="space-y-6">
-                    {marks.length === 0 ? (
-                      <p className="text-center p-10 text-[10px] font-black text-gray-300 uppercase">No internal marks recorded yet</p>
-                    ) : (
-                      Object.values(marks.reduce((acc, m) => {
-                        if (!acc[m.subjectId]) acc[m.subjectId] = { name: m.subjectName, code: m.subjectCode, testMarks: [] };
-                        acc[m.subjectId].testMarks.push(m);
-                        return acc;
-                      }, {})).map((sub, idx) => (
-                        <div key={idx} className="p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100">
-                           <div className="flex justify-between items-start mb-6">
-                              <h5 className="font-black text-gray-900 uppercase text-xs leading-tight max-w-[70%]">{sub.name}</h5>
-                              <span className="text-[9px] font-black text-blue-600 uppercase">{sub.code}</span>
-                           </div>
-                           <div className="space-y-3">
-                              {sub.testMarks.map((m, i) => (
-                                <div key={i} className="flex justify-between items-center text-[10px] font-bold py-1 border-b border-gray-200/50">
-                                   <span className="text-gray-400 uppercase tracking-widest">{m.testType}</span>
-                                   <span className={`font-black ${parseInt(m.score) < 50 ? 'text-rose-600' : 'text-blue-700'}`}>{m.score}</span>
-                                </div>
-                              ))}
-                           </div>
-                        </div>
-                      ))
-                    )}
-                 </div>
-              </div>
-
-              {/* Announcements as part of feed */}
-              <div className="bg-white shadow-2xl rounded-[3rem] p-8 sm:p-10 border border-gray-100">
-                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-8 ml-4">Campus News</h4>
-                 <div className="space-y-10">
-                    {officialNews.slice(0, 5).map(event => (
-                      <div key={event._id} className="relative group px-4">
-                                                  <div className="flex items-center justify-between mb-3">
-                                                     <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">{event.type}</span>
-                                                     <div className="flex gap-4">
-                                                       {event.eventUrl && <a href={event.eventUrl} target="_blank" rel="noreferrer" className="text-blue-600 text-[9px] font-black uppercase">Link</a>}
-                                                       <button onClick={() => setVisibleDescriptions(prev => ({...prev, [event._id]: !prev[event._id]}))} className="text-gray-400 text-[9px] font-black uppercase">{visibleDescriptions[event._id] ? 'Hide' : 'Read'}</button>
-                                                     </div>
-                                                  </div>
-                                                  {event.imageUrl && (
-                                                    <img src={event.imageUrl} alt="" className="w-full aspect-[4/3] object-cover rounded-[2rem] mb-4 border border-gray-50 shadow-sm" />
-                                                  )}
-                                                  <h4 className="font-black text-gray-900 uppercase tracking-tight leading-tight mb-2 pr-10">{event.title}</h4>                                                     {visibleDescriptions[event._id] && <p className="text-xs font-bold text-gray-500 leading-relaxed animate-fade-in">{event.description}</p>}                         <p className="text-[8px] font-black text-gray-300 uppercase mt-2">{new Date(event.createdAt).toLocaleDateString()}</p>
-                      </div>
-                    ))}
-                 </div>
-              </div>
+        {/* 📢 NEWS FEED */}
+        <div className="bg-white shadow-2xl rounded-[3rem] p-10 border border-gray-100">
+           <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-10 ml-2">Campus Bulletin</h4>
+           <div className="space-y-12">
+              {officialNews.slice(0, 5).map(event => (
+                <div key={event._id} className="group">
+                   <div className="flex items-center justify-between mb-5">
+                      <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-100">{event.type}</span>
+                      <p className="text-[9px] font-black text-gray-300 uppercase">{new Date(event.createdAt).toLocaleDateString()}</p>
+                   </div>
+                   {event.imageUrl && (
+                     <div className="relative aspect-video mb-6 overflow-hidden rounded-[2rem] shadow-lg border border-gray-100">
+                       <img src={event.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                     </div>
+                   )}
+                   <h4 className="font-black text-xl text-gray-900 uppercase tracking-tight leading-tight mb-4 group-hover:text-blue-600 transition-colors">{event.title}</h4>
+                   <p className="text-sm font-bold text-gray-500 leading-relaxed mb-6">{event.description}</p>
+                </div>
+              ))}
            </div>
         </div>
       </main>
 
       <style>{`
         @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        .animate-marquee { display: inline-block; animation: marquee 30s linear infinite; }
+        .animate-marquee { display: inline-block; animation: marquee 35s linear infinite; }
         .animate-marquee:hover { animation-play-state: paused; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );

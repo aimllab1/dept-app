@@ -13,6 +13,7 @@ export default defineSchema({
     email: v.optional(v.string()),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
+    startDate: v.optional(v.string()), // For attendance calculation start
   })
   .index("by_registrationNo", ["registrationNo"])
   .index("by_name", ["name"])
@@ -41,7 +42,7 @@ export default defineSchema({
     studentId: v.id("users"),
     subjectId: v.optional(v.id("subjects")),
     date: v.string(), 
-    status: v.union(v.literal("present"), v.literal("absent"), v.literal("leave"), v.literal("od")),
+    status: v.union(v.literal("present"), v.literal("absent"), v.literal("leave"), v.literal("od"), v.literal("holiday")),
   })
   .index("by_student_date", ["studentId", "date"])
   .index("by_date", ["date"]),
@@ -82,5 +83,16 @@ export default defineSchema({
     postedBy: v.string(),
     createdAt: v.number(),
   })
+  .index("by_createdAt", ["createdAt"]),
+
+  notifications: defineTable({
+    userId: v.optional(v.id("users")), // Optional for global alerts
+    title: v.string(),
+    message: v.string(),
+    type: v.union(v.literal("announcement"), v.literal("mark"), v.literal("attendance")),
+    isRead: v.boolean(),
+    createdAt: v.number(),
+  })
+  .index("by_user", ["userId"])
   .index("by_createdAt", ["createdAt"]),
 });
