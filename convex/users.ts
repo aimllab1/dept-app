@@ -72,6 +72,7 @@ export const addStudent = mutation({
     batchId: v.id("batches"),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
+    startDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { requesterId, batchId, ...userData } = args;
@@ -98,6 +99,7 @@ export const updateStudent = mutation({
     parentMobileNo: v.string(),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
+    startDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { requesterId, id, ...details } = args;
