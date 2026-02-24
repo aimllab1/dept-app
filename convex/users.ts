@@ -72,7 +72,6 @@ export const addStudent = mutation({
     batchId: v.id("batches"),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
-    startDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { requesterId, batchId, ...userData } = args;
@@ -99,7 +98,6 @@ export const updateStudent = mutation({
     parentMobileNo: v.string(),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
-    startDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { requesterId, id, ...details } = args;
@@ -134,22 +132,32 @@ export const getStudents = query({
     const students = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "student")).collect();
     return await Promise.all(students.map(async (student) => {
       const enrolls = await ctx.db.query("enrollments").withIndex("by_studentId", (q) => q.eq("studentId", student._id)).collect();
-      const enrollment = enrolls.sort((a, b) => b.semester - a.semester)[0];
+      const enrollment = enrolls.length > 0 ? enrolls.sort((a, b) => b.semester - a.semester)[0] : null;
+      
       let batchName = null;
       let batchStartYear: number | null = null;
+      
       if (enrollment?.batchId) {
         const batch = await ctx.db.get(enrollment.batchId);
-        batchName = batch?.name;
-        batchStartYear = batch?.startYear ?? null;
-      }
-      let profileImage = null;
-      if (student.profileImage) {
-        if (student.profileImage.startsWith("data:")) {
-          profileImage = student.profileImage;
-        } else {
-          profileImage = await ctx.storage.getUrl(student.profileImage);
+        if (batch) {
+          batchName = batch.name;
+          batchStartYear = batch.startYear;
         }
       }
+      
+      let profileImage = null;
+      if (student.profileImage) {
+        try {
+          if (student.profileImage.startsWith("data:")) {
+            profileImage = student.profileImage;
+          } else {
+            profileImage = await ctx.storage.getUrl(student.profileImage);
+          }
+        } catch (e) {
+          console.error("Error fetching profile image", e);
+        }
+      }
+      
       return {
         ...student,
         profileImage,

@@ -13,7 +13,7 @@ export default defineSchema({
     email: v.optional(v.string()),
     profileImage: v.optional(v.string()),
     address: v.optional(v.string()),
-    startDate: v.optional(v.string()), // For attendance calculation start
+    startDate: v.optional(v.string()),
   })
   .index("by_registrationNo", ["registrationNo"])
   .index("by_name", ["name"])

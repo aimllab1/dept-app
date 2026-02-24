@@ -54,7 +54,7 @@ function StaffDashboard() {
   const [visibleDescriptions, setVisibleDescriptions] = useState({});
   const [batchForm, setBatchForm] = useState({ name: '', startYear: 2024, endYear: 2028 });
   const [staffForm, setStaffForm] = useState({ name: '', password: '', role: '', profileImage: '', address: '' });
-  const [studentForm, setStudentForm] = useState({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '', address: '', startDate: '' });
+  const [studentForm, setStudentForm] = useState({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '', address: '' });
   const [subjectForm, setSubjectForm] = useState({ name: '', code: '', semester: 6, staffId: '' });
 
   // Preview States
@@ -810,7 +810,7 @@ function StaffDashboard() {
                            await addStudentMutation({...studentForm, requesterId: loggedInUser._id.toString()}); 
                            alert('Enrolled!'); 
                            setActiveView('directory'); 
-                           setStudentForm({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '', address: '', startDate: '' });
+                           setStudentForm({ name: '', registrationNo: '', dob: '', email: '', mobileNo: '', parentMobileNo: '', batchId: '', profileImage: '', address: '' });
                            setStudentImgPreview(null);
                         } catch (err) {
                            console.error(err);
@@ -823,10 +823,6 @@ function StaffDashboard() {
                         <div className="space-y-2">
                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Date of Birth</label>
                            <input type="date" className="input-field text-left" value={studentForm.dob} onChange={e => setStudentForm({...studentForm, dob: e.target.value})} required />
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Calculation Start Date</label>
-                           <input type="date" className="input-field text-left" value={studentForm.startDate} onChange={e => setStudentForm({...studentForm, startDate: e.target.value})} />
                         </div>
                         <input type="email" className="input-field text-left" placeholder="Email" value={studentForm.email} onChange={e => setStudentForm({...studentForm, email: e.target.value})} required />
                         <input className="input-field text-left" placeholder="Mobile" value={studentForm.mobileNo} onChange={e => setStudentForm({...studentForm, mobileNo: e.target.value})} required />
@@ -870,10 +866,6 @@ function StaffDashboard() {
                     }} className="grid grid-cols-1 gap-4 text-left">
                        <input className="input-field" placeholder="Name" value={editingStudent.name} onChange={e => setEditingStudent({...editingStudent, name: e.target.value})} />
                        <input className="input-field" placeholder="Reg No" value={editingStudent.registrationNo} onChange={e => setEditingStudent({...editingStudent, registrationNo: e.target.value})} />
-                       <div className="space-y-1 px-4">
-                          <label className="text-[9px] font-black text-gray-400 uppercase">Calculation Start Date</label>
-                          <input type="date" className="input-field" value={editingStudent.startDate || ''} onChange={e => setEditingStudent({...editingStudent, startDate: e.target.value})} />
-                       </div>
                        <input type="date" className="input-field" value={editingStudent.dob || ''} onChange={e => setEditingStudent({...editingStudent, dob: e.target.value})} />
                        <input className="input-field" value={editingStudent.email || ''} onChange={e => setEditingStudent({...editingStudent, email: e.target.value})} />
                        <input className="input-field" value={editingStudent.mobileNo || ''} onChange={e => setEditingStudent({...editingStudent, mobileNo: e.target.value})} />

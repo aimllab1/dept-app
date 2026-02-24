@@ -65,10 +65,6 @@ function StudentDashboard() {
   const attendanceStats = useMemo(() => {
     let relevantAttendance = allAttendance;
 
-    if (user?.startDate) {
-      relevantAttendance = allAttendance.filter((a) => a.date >= user.startDate);
-    }
-
     const counts = { present: 0, absent: 0, leave: 0, od: 0, holiday: 0 };
     relevantAttendance.forEach((a) => {
       if (counts[a.status] !== undefined) counts[a.status]++;
@@ -79,7 +75,7 @@ function StudentDashboard() {
     const percentage = totalWorkingDays > 0 ? (presence / totalWorkingDays) * 100 : 0;
 
     return { ...counts, totalWorkingDays, percentage: percentage.toFixed(2) };
-  }, [allAttendance, user?.startDate]);
+  }, [allAttendance]);
 
   const latestMarkUpdate = useMemo(() => {
     if (!marks.length) return null;
@@ -309,7 +305,7 @@ function StudentDashboard() {
                   Attendance Portal
                 </h3>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 ml-10 text-left">
-                  {user.startDate ? `From: ${new Date(user.startDate).toLocaleDateString()}` : 'History'}
+                  Comprehensive History
                 </p>
               </div>
               <div className="text-right">
